@@ -31,5 +31,11 @@ func getRoutes(h *Handler) []Route {
 			"/messages/{id}",
 			h.DeleteMessage,
 		},
+		Route{
+			"GetMessage",
+			"GET",
+			"/messages/{id}",
+			h.GetMessage,
+		},
 	}
 }

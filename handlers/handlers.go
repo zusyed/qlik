@@ -142,3 +142,58 @@ func (h *Handler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 }
+
+//GetMessage gets the message with the specified id
+func (h *Handler) GetMessage(w http.ResponseWriter, r *http.Request) {
+	var err error
+	var id int
+
+	idStr := mux.Vars(r)["id"]
+	if id, err = strconv.Atoi(idStr); err != nil {
+		w.Header().Set("Content-Type", "application/text; charset=UTF-8")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "id must be an integer")
+
+		return
+	}
+
+	message, err := h.db.GetMessage(id)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/text; charset=UTF-8")
+		if err.Error() == dal.NotFound {
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprintf(w, "Could not find record with id %d", id)
+
+			return
+		}
+
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Could not get message with id %d: %s", id, err)
+
+		return
+	}
+
+	message.IsPalindrome = isPalindrome(message.Body)
+
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	if err = json.NewEncoder(w).Encode(message); err != nil {
+		w.Header().Set("Content-Type", "application/text; charset=UTF-8")
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Encountered an error encoding JSON response")
+
+		return
+	}
+}
+
+//isPalindrome returns true if the specified string is a palindrome; otherwise returns false
+func isPalindrome(s string) bool {
+	n := len(s)
+	for i := 0; i < (n / 2); i++ {
+		if s[i] != s[n-i-1] {
+			return false
+		}
+	}
+
+	return true
+}

@@ -96,8 +96,13 @@ func (pdb *PostgresDB) GetMessages() ([]models.Message, error) {
 //GetMessage returns the message with the specified id from the database
 func (pdb *PostgresDB) GetMessage(id int) (models.Message, error) {
 	message := models.Message{}
-	err := pdb.db.First(&message, id).Error
+	result := pdb.db.First(&message, id)
+	err := result.Error
 	if err != nil {
+		if result.RecordNotFound() {
+			return message, fmt.Errorf(NotFound)
+		}
+
 		return message, fmt.Errorf("Unable to get message with the specified id %d: %s", id, err)
 	}
 
