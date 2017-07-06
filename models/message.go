@@ -4,5 +4,5 @@ package models
 type Message struct {
 	ID           int    `json:"id"`
 	Body         string `json:"body"`
-	IsPalindrome bool   `json:"isPalindrome"`
+	IsPalindrome bool   `gorm:"-" json:"isPalindrome"`
 }

@@ -21,6 +21,9 @@ const (
 
 	//DbName is the database name for the messages table
 	DbName = "messages"
+
+	//NotFound returned from database when a record is not found
+	NotFound = "not found"
 )
 
 type (
@@ -116,9 +119,14 @@ func (pdb *PostgresDB) DeleteMessage(id int) error {
 	message := models.Message{
 		ID: id,
 	}
-	err := pdb.db.Delete(&message).Error
+	result := pdb.db.Delete(&message)
+	err := result.Error
 	if err != nil {
 		return fmt.Errorf("Unable to delete message with the specified id %d: %s", id, err)
+	}
+
+	if result.RowsAffected < 1 {
+		return fmt.Errorf(NotFound)
 	}
 
 	return nil

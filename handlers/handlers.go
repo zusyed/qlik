@@ -3,10 +3,20 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
+	"strconv"
 
+	"log"
+
+	"github.com/gorilla/mux"
 	"github.com/zusyed/qlik/dal"
 	"github.com/zusyed/qlik/models"
+)
+
+const (
+	jsonContent = "application/json; charset=UTF-8"
 )
 
 type (
@@ -48,4 +58,87 @@ func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+}
+
+//CreateMessage adds the specified message
+func (h *Handler) CreateMessage(w http.ResponseWriter, r *http.Request) {
+	var err error
+
+	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
+	if err != nil {
+		w.Header().Set("Content-Type", "application/text; charset=UTF-8")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Could not parse request body: %s", err)
+
+		return
+	}
+
+	defer func() {
+		err := r.Body.Close()
+		if err != nil {
+			log.Printf("Encountered an error closing the request body: %+v", err)
+		}
+	}()
+
+	var message models.Message
+
+	if err := json.Unmarshal(body, &message); err != nil {
+		w.Header().Set("Content-Type", "application/text; charset=UTF-8")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Could not parse JSON: %s", err)
+
+		return
+	}
+
+	m, err := h.db.AddMessage(message)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/text; charset=UTF-8")
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Could not insert message in the database: %s", err)
+
+		return
+	}
+
+	w.Header().Set("Content-Type", jsonContent)
+	w.WriteHeader(http.StatusCreated)
+	if err = json.NewEncoder(w).Encode(m); err != nil {
+		w.Header().Set("Content-Type", "application/text; charset=UTF-8")
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Could not encode message: %s", err)
+
+		return
+	}
+}
+
+//DeleteMessage removes the message with the specified id
+func (h *Handler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
+	var err error
+	var id int
+
+	idStr := mux.Vars(r)["id"]
+	if id, err = strconv.Atoi(idStr); err != nil {
+		w.Header().Set("Content-Type", "application/text; charset=UTF-8")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "id must be an integer")
+
+		return
+	}
+
+	err = h.db.DeleteMessage(id)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/text; charset=UTF-8")
+		if err.Error() == dal.NotFound {
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprintf(w, "Could not find record with id %d", id)
+
+			return
+		}
+
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Could not delete message with id %d: %s", id, err)
+
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
